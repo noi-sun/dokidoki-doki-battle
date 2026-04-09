@@ -5,27 +5,31 @@ import hashlib
 import io
 import time
 
-# --- 便利関数: 画像をBase64に ---
+# --- 便利関数: 画像をBase64に（表示用） ---
 def get_img_64(image):
     buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
+    # 軽量化のため、表示用はさらに圧縮率を高める
+    image.save(buffered, format="PNG", optimize=True)
     return base64.b64encode(buffered.getvalue()).decode()
 
-# --- 画像解析 ---
-def analyze_monster(image_file, name_prefix):
-    img_bytes = image_file.getvalue()
-    img_hash = hashlib.md5(img_bytes).hexdigest()
-    img = Image.open(image_file).convert('RGB')
+# --- 🌟 軽量化版：画像解析（キャッシュ対応） ---
+@st.cache_data
+def analyze_monster(image_bytes, name_input):
+    # ファイル全体ではなくbytesデータで受け取るとキャッシュ効率が最大になります
+    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+    
+    # 【軽量化1】解析・表示用に最大400pxにリサイズ（スマホ等でもサクサク動く）
+    img.thumbnail((400, 400))
     
     # 1. 輪郭（形）の解析
     edge_img = img.convert("L").filter(ImageFilter.FIND_EDGES)
     stat = ImageStat.Stat(edge_img)
     complexity = stat.mean[0] 
     
-    # 2. 複雑さによるボーナス
+    # 2. 複雑さによるボーナスと称号
     shape_bonus = int(complexity * 2) 
     special_comment = ""
-    if complexity > 20:
+    if complexity > 10:
         special_comment = "【SR】"
     elif complexity < 5:
         special_comment = "【N】"
@@ -34,7 +38,7 @@ def analyze_monster(image_file, name_prefix):
     avg_color = img.resize((1, 1)).getpixel((0, 0))
     r, g, b = avg_color
     
-    # 属性判定 (最大値と最小値の差で無属性を判定)
+    # 属性判定
     diff = max(r, g, b) - min(r, g, b)
     if diff < 30:
         elem, shadow = "🏺", "rgba(150, 150, 150, 0.9)"
@@ -45,13 +49,16 @@ def analyze_monster(image_file, name_prefix):
     else:
         elem, shadow = "💧", "rgba(50, 50, 255, 0.9)"
     
+    # 4. 個体値（ハッシュ）
+    img_hash = hashlib.md5(image_bytes).hexdigest()
+    
     return {
         "img_64": get_img_64(img),
         "elem": elem,
         "shadow": shadow,
         "hp": int(img_hash[:2], 16) + 300,
         "atk": 50 + (max(r,g,b) // 5) + shape_bonus,
-        "name": f"{special_comment}{name_prefix}-{img_hash[:4].upper()}"
+        "name": f"{special_comment}{name_input}"
     }
 
 def get_compatibility_multiplier(attacker_elem, defender_elem):
@@ -65,7 +72,7 @@ def get_compatibility_multiplier(attacker_elem, defender_elem):
 
 # --- UI & CSS ---
 st.set_page_config(layout="wide", page_title="どきどき土器バトル")
-st.title("🤖 どきどき土器バトル：ランキング版")
+st.title("🤖 どきどき土器バトル：高速版")
 
 st.markdown("""
 <style>
@@ -75,9 +82,9 @@ st.markdown("""
 @keyframes shake { 0% { transform: translate(5px, 5px); } 20% { transform: translate(-5px, -5px); } 100% { transform: translate(0, 0); } }
 
 .monster { width: 250px; border-radius: 25px; animation: float 3s ease-in-out infinite; }
-.p1-atk { animation: attack-p1 0.4s ease-in-out; }
-.p2-atk { animation: attack-p2 0.4s ease-in-out; }
-.hit { animation: shake 0.4s ease-in-out; filter: brightness(2) contrast(2) !important; }
+.p1-atk { animation: attack-p1 0.3s ease-in-out; }
+.p2-atk { animation: attack-p2 0.3s ease-in-out; }
+.hit { animation: shake 0.3s ease-in-out; filter: brightness(1.5) contrast(1.5) !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -90,22 +97,23 @@ if "battle_active" not in st.session_state:
     })
 
 # --- サイドバー表示 ---
-st.sidebar.header("🏆 土器勝利数ランキング")
+st.sidebar.header("🏆 勝利数ランキング (TOP5)")
 if st.session_state.rankings:
-    # 勝利数順にソート
     sorted_rank = sorted(st.session_state.rankings.items(), key=lambda x: x[1], reverse=True)
-    for name, wins in sorted_rank:
+    for name, wins in sorted_rank[:5]: # 上位5件のみ表示で軽量化
         st.sidebar.write(f"**{wins}勝** : {name}")
 else:
     st.sidebar.write("まだ戦績がありません")
 
 # メインUI
 c1, c2 = st.columns(2)
-f1 = c1.file_uploader("どきモンスターＰ１ 召喚", type=["png", "jpg"])
-f2 = c2.file_uploader("どきモンスターＰ２ 召喚", type=["png", "jpg"])
-# --- 🌟 ここに追加：名前入力フォーム ---
-name1 = c1.text_input("P1のニックネーム", placeholder="例：最強の土器")
-name2 = c2.text_input("P2のニックネーム", placeholder="例：伝説のツボ")
+f1 = c1.file_uploader("Ｐ１ どきどきもんすたー召喚", type=["png", "jpg"])
+f2 = c2.file_uploader("Ｐ２ どきどきもんすたー召喚", type=["png", "jpg"])
+
+# 🌟 ニックネーム入力
+name1_input = c1.text_input("P1のニックネーム", "土器1号")
+name2_input = c2.text_input("P2のニックネーム", "土器2号")
+
 # 画像が入れ替わった際のリセット処理
 if f1 and f2:
     current_files = f"{f1.name}-{f2.name}"
@@ -115,9 +123,9 @@ if f1 and f2:
             "winner": None, "log": "新しい土器が届きました！", "last_files": current_files
         })
 
-    # 解析実行
-    p1 = analyze_monster(f1, name1 if name1 else "P1")
-    p2 = analyze_monster(f2, name2 if name2 else "P2")
+    # 🌟 解析実行 (getvalue()を渡すことでキャッシュが効く)
+    p1 = analyze_monster(f1.getvalue(), name1_input)
+    p2 = analyze_monster(f2.getvalue(), name2_input)
     
     if st.session_state.p1_hp == -1:
         st.session_state.p1_hp = p1["hp"]
@@ -134,13 +142,13 @@ if f1 and f2:
 
     # バトル開始
     if not st.session_state.battle_active and not st.session_state.winner:
-        if st.button("🚀 オートバトル開始！！", use_container_width=True):
+        if st.button("🚀 バトル開始！！", use_container_width=True):
             st.session_state.battle_active = True
             st.rerun()
 
     # 自動バトルループ
     if st.session_state.battle_active and not st.session_state.winner:
-        time.sleep(1.2)
+        time.sleep(1) 
         if st.session_state.turn == 1:
             st.session_state.p1_ani, st.session_state.p2_ani = "p1-atk", "hit"
             mul = get_compatibility_multiplier(p1["elem"], p2["elem"])
@@ -158,15 +166,12 @@ if f1 and f2:
             st.session_state.log = f"🔥 {p2['name']} の反撃！ {dmg} ダメージ！ {msg}"
             st.session_state.turn = 1
 
-        # 決着判定
         if st.session_state.p1_hp <= 0 or st.session_state.p2_hp <= 0:
             st.session_state.battle_active = False
-            winner_data = p1 if st.session_state.p1_hp > 0 else p2
-            st.session_state.winner = winner_data['name']
-            # ランキング加算
-            if st.session_state.winner not in st.session_state.rankings:
-                st.session_state.rankings[st.session_state.winner] = 0
-            st.session_state.rankings[st.session_state.winner] += 1
+            winner_name = p1['name'] if st.session_state.p1_hp > 0 else p2['name']
+            st.session_state.winner = winner_name
+            # ランキング更新
+            st.session_state.rankings[winner_name] = st.session_state.rankings.get(winner_name, 0) + 1
         st.rerun()
 
     # 決着表示
