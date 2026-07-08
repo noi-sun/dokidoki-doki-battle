@@ -8,6 +8,7 @@ import cv2
 import io
 import json
 import os
+import html
 
 # --- データ定義: 属性ごとの技リストとアイコン ---
 ELEMENTS = {
@@ -89,7 +90,7 @@ def load_rankings():
     try:
         with open(RANKINGS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except ExceptionFrame:
+    except Exception:
         return []
 
 def save_rankings(rankings):
@@ -455,7 +456,7 @@ with col_p1:
             
             st.markdown(f"""
             <div class="status-card">
-                <h3>{p1_data['icon']} {p1_data['name']}</h3>
+                <h3>{p1_data['icon']} {html.escape(p1_data['name'])}</h3>
                 <span class="element-badge" style="background-color: {p1_data['color']}; color: {ELEMENTS[p1_data['element']]['text_color']}">
                     属性: {p1_data['element']} {p1_data['icon']}
                 </span>
@@ -506,7 +507,7 @@ with col_p2:
         
         st.markdown(f"""
         <div class="status-card" style="border-color: #3498db;">
-            <h3>{players[1]['icon']} {players[1]['name']} (CPU)</h3>
+            <h3>{players[1]['icon']} {html.escape(players[1]['name'])} (CPU)</h3>
             <span class="element-badge" style="background-color: {players[1]['color']}; color: {ELEMENTS[players[1]['element']]['text_color']}">
                 属性: {players[1]['element']} {players[1]['icon']}
             </span>
@@ -528,7 +529,7 @@ with col_p2:
                 
                 st.markdown(f"""
                 <div class="status-card">
-                    <h3>{p2_data['icon']} {p2_data['name']}</h3>
+                    <h3>{p2_data['icon']} {html.escape(p2_data['name'])}</h3>
                     <span class="element-badge" style="background-color: {p2_data['color']}; color: {ELEMENTS[p2_data['element']]['text_color']}">
                         属性: {p2_data['element']} {p2_data['icon']}
                     </span>
@@ -576,8 +577,8 @@ if players[0] is not None and players[1] is not None:
             p2_bar = st.progress(1.0)
             p2_hp_text = st.empty()
             
-        p1_name_empty.markdown(f"👥 **{p1['name']}** ({p1['icon']}{p1['element']})")
-        p2_name_empty.markdown(f"🤖 **{p2['name']}** ({p2['icon']}{p2['element']})")
+        p1_name_empty.markdown(f"👥 **{html.escape(p1['name'])}** ({p1['icon']}{p1['element']})")
+        p2_name_empty.markdown(f"🤖 **{html.escape(p2['name'])}** ({p2['icon']}{p2['element']})")
         
         battle_ended = False
         winner = None
@@ -604,7 +605,7 @@ if players[0] is not None and players[1] is not None:
                 
                 action_empty.markdown(
                     f"<div style='text-align: center; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 20px;'>"
-                    f"⚔️ <b style='color:{attacker['color']};'>{attacker['name']}</b> の攻撃！<br>"
+                    f"⚔️ <b style='color:{attacker['color']};'>{html.escape(attacker['name'])}</b> の攻撃！<br>"
                     f"<span style='font-size: 1.15rem; font-weight: bold;'>「{skill['name']}」</span>{comp_comment}<br>"
                     f"<span style='font-size: 0.9rem; color: #bdc3c7;'>{skill['msg']}</span>"
                     f"</div>",
@@ -641,7 +642,7 @@ if players[0] is not None and players[1] is not None:
             st.markdown(f"""
             <div style="background: rgba(46, 204, 113, 0.2); border: 2px solid #2ecc71; border-radius: 12px; padding: 20px; text-align: center; margin-top:20px;">
                 <h2>🎉 VICTORY 🎉</h2>
-                <h3 style="color:#2ecc71;">勝者: {winner['icon']} {winner['name']}</h3>
+                <h3 style="color:#2ecc71;">勝者: {winner['icon']} {html.escape(winner['name'])}</h3>
                 <p>優れた土器の魂が、このバトルを制した！</p>
             </div>
             """, unsafe_allow_html=True)
@@ -680,7 +681,7 @@ with col_rank1:
             elem_meta = ELEMENTS.get(item["element"], ELEMENTS["無"])
             sim_data.append({
                 "順位": f"🥇 {i+1}位" if i == 0 else f"🥈 {i+1}位" if i == 1 else f"🥉 {i+1}位" if i == 2 else f"{i+1}位",
-                "名前": f"{elem_meta['icon']} {item['name']}",
+                "名前": f"{elem_meta['icon']} {html.escape(item['name'])}",
                 "属性": item["element"],
                 "類似度": f"{item['similarity']}%",
                 "勝利数": f"{item.get('wins', 0)}勝",
@@ -703,7 +704,7 @@ with col_rank2:
                 elem_meta = ELEMENTS.get(item["element"], ELEMENTS["無"])
                 win_data.append({
                     "順位": f"🥇 {i+1}位" if i == 0 else f"🥈 {i+1}位" if i == 1 else f"🥉 {i+1}位" if i == 2 else f"{i+1}位",
-                    "名前": f"{elem_meta['icon']} {item['name']}",
+                    "名前": f"{elem_meta['icon']} {html.escape(item['name'])}",
                     "属性": item["element"],
                     "類似度": f"{item['similarity']}%",
                     "勝利数": f"{item.get('wins', 0)}勝"
