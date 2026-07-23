@@ -47,7 +47,8 @@ CPU_PRESETS = [
         "max_hp": 390,
         "atk": 65,
         "def": 35,
-        "desc": "燃え盛る炎のような突起を持つ、縄文時代中期の傑作土器。"
+        "desc": "燃え盛る炎のような突起を持つ、縄文時代中期の傑作土器。",
+        "image_path": "kaen.png"
     },
     {
         "name": "水煙柄深鉢土器",
@@ -57,7 +58,8 @@ CPU_PRESETS = [
         "max_hp": 376,
         "atk": 52,
         "def": 48,
-        "desc": "湧き上がる水や煙を模したとされる美しい隆起線を持つ土器。"
+        "desc": "湧き上がる水や煙を模したとされる美しい隆起線を持つ土器。",
+        "image_path": "suien.png"
     },
     {
         "name": "遮光器土偶",
@@ -67,7 +69,8 @@ CPU_PRESETS = [
         "max_hp": 384,
         "atk": 45,
         "def": 60,
-        "desc": "不思議なゴーグル型をした巨大な目を持ち、防御力の極めて高い土偶。"
+        "desc": "不思議なゴーグル型をした巨大な目を持ち、防御力の極めて高い土偶。",
+        "image_path": "dogu.png"
     },
     {
         "name": "弥生式土器（壺型）",
@@ -77,7 +80,8 @@ CPU_PRESETS = [
         "max_hp": 364,
         "atk": 55,
         "def": 40,
-        "desc": "シンプルながら洗練されたフォルムを持つ、実用性に優れた農耕社会の土器。"
+        "desc": "シンプルながら洗練されたフォルムを持つ、実用性に優れた農耕社会の土器。",
+        "image_path": "yayoi.png"
     }
 ]
 
@@ -479,7 +483,8 @@ with col_p2:
             "def": cpu_pattern["def"],
             "similarity": cpu_pattern["similarity"],
             "custom": False,
-            "desc": cpu_pattern["desc"]
+            "desc": cpu_pattern["desc"],
+            "image_path": cpu_pattern.get("image_path")
         }
         
         st.markdown(f"""
@@ -493,6 +498,10 @@ with col_p2:
             <p><b>❤️ HP:</b> {players[1]['hp']} | <b>⚔️ ATK:</b> {players[1]['atk']} | <b>🛡️ DEF:</b> {players[1]['def']}</p>
         </div>
         """, unsafe_allow_html=True)
+        
+        if players[1].get("image_path") and os.path.exists(players[1]["image_path"]):
+            st.image(players[1]["image_path"], caption=f"CPU: {players[1]['name']}", use_container_width=True)
+
         
     else:
         st.subheader("Player 2 (対戦相手)")
