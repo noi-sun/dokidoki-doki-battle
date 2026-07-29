@@ -1,0 +1,137 @@
+"""
+バトルアリーナ画面（対戦格闘ゲーム風レイアウト）用のUI描画ヘルパー。
+dokidoki.py 本体から呼び出される。
+"""
+import base64
+import html
+import io
+import os
+import streamlit as st
+from PIL import Image
+
+
+def hp_bar_html(player, side):
+    """HPゲージのHTMLを生成する。
+    side='left'  -> 1P用。バーは左端(0%)から中央(100%)へ左詰めで伸びる。
+    side='right' -> 2P用。バーは中央(100%)から右端(0%)へ右詰めで伸びる(ミラー)。
+    """
+    if player is not None:
+        hp = max(0, player.get("hp", 0) or 0)
+        max_hp = player.get("max_hp", 1) or 1
+        pct = max(0, min(100, int(hp / max_hp * 100)))
+        name = player.get("name") or "???"
+        icon = player.get("icon", "")
+        element = player.get("element", "")
+        label = f"{icon} {html.escape(name)} ({element})"
+        hp_label = f"HP: {hp} / {player.get('max_hp', 0)}"
+    else:
+        pct = 0
+        label = "未設定"
+        hp_label = "HP: -"
+
+    reverse_class = " reverse" if side == "right" else ""
+    return f"""
+    <div class="hpbar-wrap">
+        <div class="hpbar-label">{label}</div>
+        <div class="hpbar-track{reverse_class}">
+            <div class="hpbar-fill" style="width:{pct}%;"></div>
+        </div>
+        <div class="hpbar-hp">{hp_label}</div>
+    </div>
+    """
+
+
+def stat_box_html(player, side_label, elements):
+    """左右の縦長ステータスボックス(名前・類似度・HP/ATK/DEF・属性)のHTMLを生成する。"""
+    if player is not None:
+        name = html.escape(player.get("name") or "???")
+        icon = player.get("icon", "")
+        similarity = player.get("similarity")
+        hp = player.get("hp", "-")
+        atk = player.get("atk", "-")
+        dfn = player.get("def", "-")
+        element = player.get("element")
+        similarity_text = f"{similarity}%" if similarity is not None else "-"
+    else:
+        name = "未設定"
+        icon = "❔"
+        similarity_text = "-"
+        hp = atk = dfn = "-"
+        element = None
+
+    chips = ""
+    for elem_key in ["火", "水", "草", "無"]:
+        meta = elements[elem_key]
+        active = " active" if elem_key == element else ""
+        chips += f"<span class='elem-chip{active}'>{meta['icon']}{elem_key}</span>"
+
+    side_class = "sf-side-p1" if side_label == "1P" else "sf-side-p2" if side_label == "2P" else ""
+
+    return f"""
+    <div class="status-card {side_class}">
+        <h3 style="text-align:center; margin-bottom:4px;">{side_label}</h3>
+        <h4 style="text-align:center; margin-top:0;">{icon} {name}</h4>
+        <p><b>📐 類似度:</b> {similarity_text}</p>
+        <p><b>❤️ HP:</b> {hp}</p>
+        <p><b>⚔️ ATK:</b> {atk} &nbsp; <b>🛡️ DEF:</b> {dfn}</p>
+        <p><b>色:</b></p>
+        <div class="gb-elem-legend">{chips}</div>
+    </div>
+    """
+
+
+def _image_to_data_uri(img_source, max_size=480):
+    """PIL.Image または画像ファイルパスを、軽量化したJPEGのdata URIに変換する。
+    (勝者演出でアニメーション付きの<img>タグとして埋め込むために使用)"""
+    try:
+        if hasattr(img_source, "save"):
+            pil_img = img_source
+        else:
+            pil_img = Image.open(img_source)
+        pil_img = pil_img.convert("RGB").copy()
+        pil_img.thumbnail((max_size, max_size))
+        buf = io.BytesIO()
+        pil_img.save(buf, format="JPEG", quality=85)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"data:image/jpeg;base64,{b64}"
+    except Exception:
+        return None
+
+
+def render_battle_sprite_to(container, player, side=None, floating=False):
+    """指定したプレースホルダー(st.empty()など)にスプライトを描画する。
+    'image'(PIL.Image)があればそれを、無ければ'image_path'のファイルを、
+    どちらも無ければ属性アイコンのプレースホルダーを表示する。
+    side='p1'/'p2' を渡すと、プレースホルダー枠が青(1P)/赤(2P)にハイライトされる。
+    floating=True にすると、勝者演出としてふわふわ浮くアニメーションを付けて表示する。"""
+    img_source = None
+    if player.get("image") is not None:
+        img_source = player["image"]
+    elif player.get("image_path") and os.path.exists(player["image_path"]):
+        img_source = player["image_path"]
+
+    win_badge = "<div class='winner-badge'>WIN!</div>" if floating else ""
+
+    if img_source is not None:
+        if floating:
+            data_uri = _image_to_data_uri(img_source)
+            if data_uri is not None:
+                container.markdown(
+                    f"<div class='winner-floating winner-wrap'>"
+                    f"<img src='{data_uri}' style='width:100%; display:block;'/>"
+                    f"{win_badge}"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                return
+        container.image(img_source, use_container_width=True)
+    else:
+        side_class = f" sf-side-{side}" if side else ""
+        floating_class = " winner-floating winner-wrap" if floating else ""
+        container.markdown(
+            f"<div class='gb-sprite-box{side_class}{floating_class}'>"
+            f"<span style='font-size:3.5rem;'>{player.get('icon', '🏺')}</span>"
+            f"{win_badge}"
+            f"</div>",
+            unsafe_allow_html=True
+        )
