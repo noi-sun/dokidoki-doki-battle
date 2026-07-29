@@ -1,3 +1,4 @@
+
 import streamlit as st
 from PIL import Image
 import hashlib
@@ -9,6 +10,9 @@ import io
 import json
 import os
 import html
+
+import gb_theme
+import battle_sync
 
 # --- データ定義: 属性ごとの技リストとアイコン ---
 ELEMENTS = {
@@ -334,75 +338,7 @@ def get_status_from_image(image_file, name=None, base_idx=0):
 # --- ページ設定とCSS注入 ---
 st.set_page_config(page_title="ドキドキ粘土土器バトル", layout="wide", page_icon="🏺")
 
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&family=Zen+Maru+Gothic:wght@500;700&display=swap');
-
-    .stApp {
-        background-color: #121216;
-        color: #f7f7f9;
-        font-family: 'Zen Maru Gothic', 'Outfit', sans-serif;
-    }
-
-    .main-title {
-        font-size: 3rem;
-        background: linear-gradient(135deg, #e67e22, #f1c40f, #e74c3c);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        text-align: center;
-        font-weight: 700;
-        margin-bottom: 0px;
-    }
-    .sub-title {
-        text-align: center;
-        color: #a0a0a5;
-        font-size: 1.1rem;
-        margin-bottom: 2rem;
-    }
-
-    .status-card {
-        background: rgba(30, 30, 38, 0.7);
-        border: 2px solid #3f3f4e;
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(8px);
-        margin-bottom: 15px;
-        transition: all 0.3s ease;
-    }
-    .status-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 40px 0 rgba(230, 126, 34, 0.2);
-        border-color: #e67e22;
-    }
-
-    .element-badge {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        font-weight: bold;
-        text-align: center;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-
-    div[data-testid="stProgress"] > div > div > div {
-        background-image: linear-gradient(135deg, #e74c3c, #f1c40f);
-    }
-
-    table {
-        background-color: rgba(30, 30, 38, 0.5);
-        color: #fff;
-        border-radius: 8px;
-        border-collapse: collapse;
-    }
-
-    th {
-        background-color: #2b2b36 !important;
-        color: #e67e22 !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+gb_theme.inject_gb_theme()
 
 st.markdown("<p class='main-title'>🏺 粘土土器バトル！DokiDoki CLAY ARENA</p>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>作成した粘土土器の写真をアップロードしてバトルするゲーム！基準モデルに近いほど強く、色によって属性が決まります。</p>", unsafe_allow_html=True)
@@ -431,6 +367,13 @@ with st.sidebar:
 
     st.markdown("---")
     game_mode = st.radio("対戦モード選択", ["👩‍💻 CPU対戦 (1人プレイ)", "👥 プレイヤー対戦 (2人プレイ)"])
+
+    st.markdown("---")
+    st.markdown(
+        "<a class='gb-link-button' href='spectator' target='_blank' rel='noopener'>📺 観戦ウィンドウを開く</a>",
+        unsafe_allow_html=True
+    )
+    st.caption("バトル中の様子を別ウィンドウ・別端末でリアルタイムに表示します。")
 
 # プレイヤーデータ格納
 players = [None, None]
@@ -564,22 +507,49 @@ if players[0] is not None and players[1] is not None:
         st.divider()
 
         battle_title = st.empty()
+
+        # 敵(P2)側：HPボックスを左、スプライトを右に配置（クラシックな対戦画面風レイアウト）
+        col_enemy_hp, col_enemy_sprite = st.columns([3, 2])
+        with col_enemy_hp:
+            with st.container(border=True):
+                p2_name_empty = st.empty()
+                p2_bar = st.progress(1.0)
+                p2_hp_text = st.empty()
+        with col_enemy_sprite:
+            gb_theme.render_battle_sprite(p2)
+
+        # 自分(P1)側：スプライトを左、HPボックスを右に配置
+        col_player_sprite, col_player_hp = st.columns([2, 3])
+        with col_player_sprite:
+            gb_theme.render_battle_sprite(p1)
+        with col_player_hp:
+            with st.container(border=True):
+                p1_name_empty = st.empty()
+                p1_bar = st.progress(1.0)
+                p1_hp_text = st.empty()
+
+        # バトルメッセージ欄は下部に全幅で配置
         action_empty = st.empty()
 
-        col_hp1, col_vs, col_hp2 = st.columns([4, 1, 4])
-        with col_hp1:
-            p1_name_empty = st.empty()
-            p1_bar = st.progress(1.0)
-            p1_hp_text = st.empty()
-        with col_vs:
-            st.markdown("<h1 style='text-align:center; color:#e74c3c;'>VS</h1>", unsafe_allow_html=True)
-        with col_hp2:
-            p2_name_empty = st.empty()
-            p2_bar = st.progress(1.0)
-            p2_hp_text = st.empty()
+        p1_name_empty.markdown(f"**{html.escape(p1['name'])}** ({p1['icon']}{p1['element']})")
+        p2_name_empty.markdown(f"**{html.escape(p2['name'])}** ({p2['icon']}{p2['element']})")
 
-        p1_name_empty.markdown(f"👥 **{html.escape(p1['name'])}** ({p1['icon']}{p1['element']})")
-        p2_name_empty.markdown(f"🤖 **{html.escape(p2['name'])}** ({p2['icon']}{p2['element']})")
+        # 観戦ウィンドウ用にスプライト画像を保存し、初期状態を共有ファイルに書き込む
+        p1_sprite_path = None
+        if p1.get("image") is not None:
+            p1_sprite_path = battle_sync.save_sprite(p1["image"], "p1_sprite.png")
+        elif p1.get("image_path") and os.path.exists(p1["image_path"]):
+            p1_sprite_path = p1["image_path"]
+
+        p2_sprite_path = None
+        if p2.get("image") is not None:
+            p2_sprite_path = battle_sync.save_sprite(p2["image"], "p2_sprite.png")
+        elif p2.get("image_path") and os.path.exists(p2["image_path"]):
+            p2_sprite_path = p2["image_path"]
+
+        battle_sync.write_battle_state(
+            battle_sync.build_state("battle", 0, 12, p1, p2, p1_sprite_path, p2_sprite_path)
+        )
 
         battle_ended = False
         winner = None
@@ -605,12 +575,22 @@ if players[0] is not None and players[1] is not None:
                 comp_comment = " (効果はバツグン！)" if comp_mult > 1.0 else " (効果はいまひとつ...)" if comp_mult < 1.0 else ""
 
                 action_empty.markdown(
-                    f"<div style='text-align: center; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 20px;'>"
-                    f"⚔️ <b style='color:{attacker['color']};'>{html.escape(attacker['name'])}</b> の攻撃！<br>"
+                    f"<div class='gb-dialogue'>"
+                    f"⚔️ <b>{html.escape(attacker['name'])}</b> の攻撃！<br>"
                     f"<span style='font-size: 1.15rem; font-weight: bold;'>「{skill['name']}」</span>{comp_comment}<br>"
-                    f"<span style='font-size: 0.9rem; color: #bdc3c7;'>{skill['msg']}</span>"
+                    f"<span style='font-size: 0.9rem;'>{skill['msg']}</span>"
                     f"</div>",
                     unsafe_allow_html=True
+                )
+
+                message_state = {
+                    "attacker_name": attacker['name'],
+                    "skill_name": skill['name'],
+                    "comp_comment": comp_comment,
+                    "skill_msg": skill['msg'],
+                }
+                battle_sync.write_battle_state(
+                    battle_sync.build_state("battle", turn, 12, p1, p2, p1_sprite_path, p2_sprite_path, message=message_state)
                 )
 
                 time.sleep(1.0)
@@ -625,6 +605,10 @@ if players[0] is not None and players[1] is not None:
 
                 bar.progress(defender['hp'] / defender['max_hp'])
                 hp_text.markdown(f"**HP: {defender['hp']} / {defender['max_hp']}**")
+
+                battle_sync.write_battle_state(
+                    battle_sync.build_state("battle", turn, 12, p1, p2, p1_sprite_path, p2_sprite_path, message=message_state)
+                )
 
                 if defender["hp"] <= 0:
                     winner = attacker
@@ -641,12 +625,17 @@ if players[0] is not None and players[1] is not None:
             st.balloons()
             st.success(f"🏆 バトル決着！ 勝者：【{winner['name']}】")
             st.markdown(f"""
-            <div style="background: rgba(46, 204, 113, 0.2); border: 2px solid #2ecc71; border-radius: 12px; padding: 20px; text-align: center; margin-top:20px;">
+            <div class="gb-result-box">
                 <h2>🎉 VICTORY 🎉</h2>
-                <h3 style="color:#2ecc71;">勝者: {winner['icon']} {html.escape(winner['name'])}</h3>
+                <h3>勝者: {winner['icon']} {html.escape(winner['name'])}</h3>
                 <p>優れた土器の魂が、このバトルを制した！</p>
             </div>
             """, unsafe_allow_html=True)
+
+            battle_sync.write_battle_state(
+                battle_sync.build_state("finished", turn, 12, p1, p2, p1_sprite_path, p2_sprite_path,
+                                         winner_name=winner['name'], draw=False)
+            )
 
             # カスタム(プレイヤー)土器が勝った場合、勝利数をインクリメント
             if winner.get("custom", False):
@@ -654,11 +643,15 @@ if players[0] is not None and players[1] is not None:
         else:
             st.warning("⚔️ 12ターンが経過しました！ 引き分けです。")
             st.markdown("""
-            <div style="background: rgba(241, 196, 15, 0.2); border: 2px solid #f1c40f; border-radius: 12px; padding: 20px; text-align: center; margin-top:20px;">
+            <div class="gb-result-box">
                 <h2>🤝 DRAW 🤝</h2>
                 <p>両者譲らぬ名勝負！ 土器の強さは互角だった！</p>
             </div>
             """, unsafe_allow_html=True)
+
+            battle_sync.write_battle_state(
+                battle_sync.build_state("finished", turn, 12, p1, p2, p1_sprite_path, p2_sprite_path, draw=True)
+            )
 
 else:
     st.info("💡 土器の写真をアップロードしてください。対戦相手をセットするとバトルが開始できます。")
